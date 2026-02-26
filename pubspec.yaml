@@ -1,0 +1,63 @@
+name: esbeg_ecommerce
+description: "A new Flutter project."
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  carousel_slider: ^4.2.1
+  flutter:
+    sdk: flutter
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  http: ^1.2.0
+  dio: ^5.4.0
+  dio_cookie_manager: ^3.1.1
+  cookie_jar: ^4.0.8
+  palette_generator: ^0.3.3+3
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # ─── ASSETS ──────────────────────────────────────────────────────────────────
+  assets:
+    - assets/images/size_guide.png
+    - assets/images/banner1.png
+    - assets/images/banner2.png
+    - assets/images/banner3.png
+    - assets/logo/esbeg_logo.png
+    - assets/logo/google_logo.png
+    - assets/logo/instagram_logo.png
+    - assets/logo/whatsapp_logo.png
+
+  # ─── FONTS ───────────────────────────────────────────────────────────────────
+  fonts:
+    - family: RobotoSlab
+      fonts:
+        - asset: assets/fonts/RobotoSlab-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/RobotoSlab-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/RobotoSlab-Light.ttf
+          weight: 300
+        - asset: assets/fonts/RobotoSlab-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/RobotoSlab-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/RobotoSlab-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/RobotoSlab-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/RobotoSlab-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/RobotoSlab-Black.ttf
+          weight: 900

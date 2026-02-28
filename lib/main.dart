@@ -12,6 +12,7 @@ import 'screens/register_screen.dart';
 import 'providers/addresses_provider.dart';
 import 'providers/vouchers_provider.dart';
 import 'screens/orders_screen.dart';
+import '../utilities/app_theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,7 +32,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'E-Commerce App',
-        theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+        theme: AppTheme.light,
         home: const HomeScreen(),
         routes: {
           '/cart': (context) => const CartsScreen(),

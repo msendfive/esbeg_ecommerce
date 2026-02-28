@@ -432,7 +432,7 @@ class _ProductCard extends StatelessWidget {
                   children: [
                     // Category & brand pills
                     Wrap(
-                      spacing: kSpaceXS + 2,
+                      spacing: kSpaceXS,
                       runSpacing: kSpaceXS,
                       children: [
                         _Pill(label: categoryName),

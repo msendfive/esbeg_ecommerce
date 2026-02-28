@@ -9,6 +9,7 @@ import '../screens/categories_screen.dart';
 import '../utilities/constants.dart';
 import '../widgets/header_widget.dart';
 import '../widgets/footer_widget.dart';
+import '../utilities/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // ProductDetailScreen
@@ -1106,8 +1107,9 @@ class _QuantitySelector extends StatelessWidget {
                   onChanged: (v) {
                     if (v.isEmpty) return;
                     final parsed = int.tryParse(v);
-                    if (parsed != null && parsed > 0)
+                    if (parsed != null && parsed > 0) {
                       onUpdate(parsed, maxStock);
+                    }
                   },
                   onSubmitted: (v) {
                     final parsed = int.tryParse(v);

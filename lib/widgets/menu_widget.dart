@@ -380,7 +380,7 @@ class _WelcomeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: kSpaceXS),
                     Text(
-                      auth.name ?? 'User',
+                      auth.full_name ?? 'User',
                       style: Theme.of(
                         context,
                       ).textTheme.titleLarge?.copyWith(color: Colors.white),
@@ -766,6 +766,7 @@ class _BottomActions extends StatelessWidget {
                       Navigator.pop(context);
                       Navigator.pushNamed(context, '/login');
                     },
+                    style: Theme.of(context).elevatedButtonTheme.style,
                     child: const Text('Login'),
                   ),
                 ),

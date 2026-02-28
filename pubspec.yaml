@@ -38,6 +38,7 @@ flutter:
     - assets/logo/google_logo.png
     - assets/logo/instagram_logo.png
     - assets/logo/whatsapp_logo.png
+    - assets/data/wilayah.json
 
   # ─── FONTS ───────────────────────────────────────────────────────────────────
   fonts:

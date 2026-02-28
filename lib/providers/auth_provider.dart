@@ -10,7 +10,7 @@ class AuthProvider with ChangeNotifier {
 
   String? get token => _token;
 
-  String? get name => _user?['full_name'];
+  String? get full_name => _user?['username'];
   String? get email => _user?['email'];
   String? get phone => _user?['phone'];
   String? get role => _user?['role'];
@@ -23,6 +23,9 @@ class AuthProvider with ChangeNotifier {
   void login({required String token, required Map<String, dynamic> user}) {
     _token = token;
     _user = user;
+
+    debugPrint("USER LOGIN DATA: $user"); // ⭐ cek field asli API
+
     notifyListeners();
   }
 
@@ -35,7 +38,7 @@ class AuthProvider with ChangeNotifier {
   // ================= UPDATE PROFILE =================
 
   void updateProfile({
-    String? name,
+    String? full_name,
     String? phone,
     String? avatarUrl,
     String? email,
@@ -44,8 +47,8 @@ class AuthProvider with ChangeNotifier {
 
     _user = Map<String, dynamic>.from(_user!);
 
-    if (name != null) {
-      _user!['full_name'] = name;
+    if (full_name != null) {
+      _user!['full_name'] = full_name;
     }
 
     if (phone != null) {

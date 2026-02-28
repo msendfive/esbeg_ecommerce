@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/users_model.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfileService {
   static const String baseUrl = "http://192.168.2.35:8000/api";
@@ -11,6 +12,9 @@ class ProfileService {
       Uri.parse("$baseUrl/profile"),
       headers: {"Accept": "application/json", "Authorization": "Bearer $token"},
     );
+
+    debugPrint("STATUS: ${res.statusCode}");
+    debugPrint("BODY: ${res.body}");
 
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);

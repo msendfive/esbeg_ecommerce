@@ -12,7 +12,6 @@ import '../screens/carts_screen.dart';
 import '../screens/brands_screen.dart';
 import '../screens/categories_screen.dart';
 import '../screens/profile_screen.dart';
-import '../screens/login_screen.dart';
 import '../screens/register_screen.dart';
 import '../utilities/constants.dart';
 
@@ -63,7 +62,6 @@ class _MenuSheetState extends State<_MenuSheet>
   @override
   void initState() {
     super.initState();
-
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -337,13 +335,14 @@ class _WelcomeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (_, auth, _) {
+        // ✅ __ not _
         if (!auth.isLoggedIn) return const SizedBox.shrink();
 
         return Container(
           padding: const EdgeInsets.all(kSpaceLG),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [kPrimaryColor, const Color(0xFF26D0CE)],
+            gradient: const LinearGradient(
+              colors: [kPrimaryColor, Color(0xFF26D0CE)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -420,6 +419,7 @@ class _QuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (_, auth, _) => Row(
+        // ✅ __ not _
         children: [
           Expanded(
             child: _ActionCard(
@@ -537,7 +537,6 @@ class _ExpandableSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header row
         Material(
           color: kSurfaceColor,
           borderRadius: BorderRadius.circular(kRadiusLG),
@@ -609,8 +608,6 @@ class _ExpandableSection extends StatelessWidget {
             ),
           ),
         ),
-
-        // Expanded content
         AnimatedSize(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -710,6 +707,7 @@ class _BottomActions extends StatelessWidget {
       child: SafeArea(
         child: Consumer<AuthProvider>(
           builder: (_, auth, _) {
+            // ✅ __ not _
             if (auth.isLoggedIn) {
               return Row(
                 children: [
@@ -751,12 +749,12 @@ class _BottomActions extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      // showModalBottomSheet(
-                      //   context: context,
-                      //   isScrollControlled: true,
-                      //   backgroundColor: Colors.transparent,
-                      //   // builder: (_) => const RegisterScreen(),
-                      // );
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const RegisterScreen(), // ✅ uncommented
+                      );
                     },
                     child: const Text('Sign Up'),
                   ),

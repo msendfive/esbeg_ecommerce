@@ -1,0 +1,36 @@
+{
+  "api": {
+    "brand": [
+      {
+        "brand_id": 1,
+        "category_id": 1,
+        "name": "Esbeg Apparel",
+        "image_logo": "brands/esbeg_logo.png"
+      }
+    ],
+    "category": [
+      {
+        "category_id": 1,
+        "name": "Hoodie"
+      }
+    ],
+    "product": [
+      {
+        "product_id": 101,
+        "name": "Esbeg Classic Hoodie",
+        "price": 299000,
+        "brand": {
+          "name": "Esbeg Apparel",
+          "category_id": 1
+        },
+        "primary_image": {
+          "image_url": "products/hoodie_navy.jpg"
+        },
+        "is_featured": 1,
+        "description": "Premium cotton hoodie.",
+        "created_at": "2026-02-25T10:00:00Z",
+        "variants": []
+      }
+    ]
+  }
+}

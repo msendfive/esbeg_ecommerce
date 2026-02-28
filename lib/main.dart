@@ -8,8 +8,10 @@ import 'screens/home_screen.dart';
 import 'screens/carts_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'providers/addresses_provider.dart';
 import 'providers/vouchers_provider.dart';
+import 'screens/orders_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,7 +36,9 @@ class MyApp extends StatelessWidget {
         routes: {
           '/cart': (context) => const CartsScreen(),
           '/checkout': (context) => const CheckoutScreen(),
-          // '/login': (context) => const Material(child: LoginScreen()),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/orders': (context) => const OrdersScreen(),
         },
       ),
     );

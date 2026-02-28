@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../models/addresses_model.dart';
 import '../providers/auth_provider.dart';
@@ -10,8 +12,7 @@ import '../widgets/header_widget.dart';
 import '../widgets/footer_widget.dart';
 
 // ---------------------------------------------------------------------------
-// ProfileScreen — personal info, transactions, addresses, and logout.
-// Replaces: profile_page.dart  →  screens/profile_screen.dart
+// ProfileScreen
 // ---------------------------------------------------------------------------
 
 class ProfileScreen extends StatefulWidget {
@@ -59,7 +60,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: kSpaceLG),
             _buildContent(auth),
             const SizedBox(height: kSpaceLG),
-            _AccountSettings(onLogout: () => _showLogoutDialog(context)),
+            _AccountSettings(
+              onLogout: () => _showLogoutDialog(context),
+              onChangePassword: () =>
+                  _showSheet(context, const _ChangePasswordSheet()),
+            ),
             const SizedBox(height: kSpaceLG),
             const FooterWidget(),
           ],
@@ -68,16 +73,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ─── CONTENT SWITCHER ──────────────────────────────────────────────────────
+
   Widget _buildContent(AuthProvider auth) {
     switch (_selectedMenu) {
       case 1:
         return const _TransactionsCard();
       case 2:
-        return _AddressesCard();
+        return const _AddressesCard();
       default:
-        return _ProfileDetails(auth: auth);
+        return _ProfileDetails(
+          auth: auth,
+          onEdit: () => _showSheet(context, _EditProfileSheet(auth: auth)),
+        );
     }
   }
+
+  // ─── SHEET HELPER ──────────────────────────────────────────────────────────
+
+  void _showSheet(BuildContext context, Widget sheet) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => sheet,
+    );
+  }
+
+  // ─── LOGOUT DIALOG ─────────────────────────────────────────────────────────
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -135,10 +158,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Private sub-widgets
+// Shared card shell
 // ---------------------------------------------------------------------------
-
-// ─── Shared card shell ───────────────────────────────────────────────────────
 
 class _CardShell extends StatelessWidget {
   const _CardShell({required this.child});
@@ -164,7 +185,9 @@ class _CardShell extends StatelessWidget {
   );
 }
 
-// ─── Profile header ──────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Profile header banner
+// ---------------------------------------------------------------------------
 
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.auth});
@@ -188,8 +211,18 @@ class _ProfileHeader extends StatelessWidget {
             color: kSurfaceColor,
             borderRadius: BorderRadius.circular(kSpaceXL),
             border: Border.all(color: Colors.white, width: 3),
+            // Menggunakan image decoration agar gambar rapi mengikuti bentuk kontainer
+            image: auth.avatarUrl != null && auth.avatarUrl!.isNotEmpty
+                ? DecorationImage(
+                    image: NetworkImage(auth.avatarUrl!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
-          child: const Icon(Icons.person, size: 40, color: kTextSecondaryColor),
+          // Tampilkan Icon hanya jika avatarUrl kosong
+          child: auth.avatarUrl != null && auth.avatarUrl!.isNotEmpty
+              ? null
+              : const Icon(Icons.person, size: 40, color: kTextSecondaryColor),
         ),
         const SizedBox(width: kSpaceLG),
         Expanded(
@@ -228,7 +261,9 @@ class _ProfileHeader extends StatelessWidget {
   );
 }
 
-// ─── Menu section ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Menu tab section
+// ---------------------------------------------------------------------------
 
 class _MenuSection extends StatelessWidget {
   const _MenuSection({required this.selectedMenu, required this.onSelect});
@@ -336,12 +371,15 @@ class _MenuItem extends StatelessWidget {
   );
 }
 
-// ─── Profile details ─────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Profile details tab
+// ---------------------------------------------------------------------------
 
 class _ProfileDetails extends StatelessWidget {
-  const _ProfileDetails({required this.auth});
+  const _ProfileDetails({required this.auth, required this.onEdit});
 
   final AuthProvider auth;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) => _CardShell(
@@ -355,7 +393,10 @@ class _ProfileDetails extends StatelessWidget {
               'Personal Information',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            TextButton(onPressed: () {}, child: const Text('Edit')),
+            TextButton(
+              onPressed: onEdit, // ✅ wired
+              child: const Text('Edit'),
+            ),
           ],
         ),
         const SizedBox(height: kSpaceXL),
@@ -364,6 +405,11 @@ class _ProfileDetails extends StatelessWidget {
           label: 'Full Name',
           value: auth.name ?? '-',
         ),
+        // _DetailRow(
+        //   icon: Icons.alternate_email,
+        //   label: 'Username',
+        //   value: auth.username ?? '-',
+        // ),
         _DetailRow(
           icon: Icons.email_outlined,
           label: 'Email',
@@ -417,7 +463,9 @@ class _DetailRow extends StatelessWidget {
   );
 }
 
-// ─── Transactions card ────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Transactions tab (placeholder)
+// ---------------------------------------------------------------------------
 
 class _TransactionsCard extends StatelessWidget {
   const _TransactionsCard();
@@ -461,9 +509,13 @@ class _TransactionsCard extends StatelessWidget {
   );
 }
 
-// ─── Addresses card ──────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Addresses tab
+// ---------------------------------------------------------------------------
 
 class _AddressesCard extends StatelessWidget {
+  const _AddressesCard();
+
   void _showAddressSheet(BuildContext context, {Address? addr}) {
     showModalBottomSheet(
       context: context,
@@ -509,7 +561,6 @@ class _AddressesCard extends StatelessWidget {
         if (prov.loading) {
           return const Center(child: CircularProgressIndicator());
         }
-
         return _CardShell(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +649,7 @@ class _AddressCard extends StatelessWidget {
                           textColor: kTextSecondaryColor,
                         ),
                       if (addr.isDefault)
-                        _Badge(
+                        const _Badge(
                           label: 'Default',
                           bgColor: kPrimaryColor,
                           textColor: Colors.white,
@@ -701,12 +752,18 @@ class _EmptyAddresses extends StatelessWidget {
   );
 }
 
-// ─── Account settings (logout) ───────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Account settings row (logout + change password)
+// ---------------------------------------------------------------------------
 
 class _AccountSettings extends StatelessWidget {
-  const _AccountSettings({required this.onLogout});
+  const _AccountSettings({
+    required this.onLogout,
+    required this.onChangePassword,
+  });
 
   final VoidCallback onLogout;
+  final VoidCallback onChangePassword;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -722,27 +779,451 @@ class _AccountSettings extends StatelessWidget {
         ),
       ],
     ),
-    child: ListTile(
-      onTap: onLogout,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: kSpaceXL,
-        vertical: kSpaceXS,
-      ),
-      leading: const Icon(Icons.logout, color: kErrorColor, size: 24),
-      title: Text(
-        'Logout',
-        style: Theme.of(
-          context,
-        ).textTheme.titleSmall?.copyWith(color: kErrorColor),
-      ),
-      trailing: const Icon(Icons.chevron_right, color: kBorderColor),
+    child: Column(
+      children: [
+        ListTile(
+          onTap: onChangePassword,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: kSpaceXL,
+            vertical: kSpaceXS,
+          ),
+          leading: const Icon(
+            Icons.lock_outline,
+            color: kPrimaryColor,
+            size: 24,
+          ),
+          title: Text(
+            'Change Password',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          trailing: const Icon(Icons.chevron_right, color: kBorderColor),
+        ),
+        Divider(height: 1, color: kBorderColor),
+        ListTile(
+          onTap: onLogout,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: kSpaceXL,
+            vertical: kSpaceXS,
+          ),
+          leading: const Icon(Icons.logout, color: kErrorColor, size: 24),
+          title: Text(
+            'Logout',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(color: kErrorColor),
+          ),
+          trailing: const Icon(Icons.chevron_right, color: kBorderColor),
+        ),
+      ],
     ),
   );
 }
 
 // ---------------------------------------------------------------------------
-// AddressFormSheet — add or edit a shipping address.
-// Replaces: AddAddressSheet  →  AddressFormSheet
+// _EditProfileSheet — PUT /api/profile  (full_name, phone, avatar_url)
+// ---------------------------------------------------------------------------
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({required this.auth});
+
+  final AuthProvider auth;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  // late final TextEditingController _usernameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _avatarController;
+
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.auth.name ?? '');
+    _phoneController = TextEditingController(text: widget.auth.phone ?? '');
+    _avatarController = TextEditingController(
+      text: widget.auth.avatarUrl ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _avatarController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final token = context.read<AuthProvider>().token!;
+      final response = await http.put(
+        Uri.parse('$kBaseUrl/api/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'full_name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'avatar_url': _avatarController.text.trim(),
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        // Update local auth state with new values
+        context.read<AuthProvider>().updateProfile(
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          avatarUrl: _avatarController.text.trim(),
+        );
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        setState(() => _error = data['message'] ?? 'Update failed');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: kScaffoldBgColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
+        ),
+        padding: EdgeInsets.only(
+          left: kSpaceXL,
+          right: kSpaceXL,
+          top: kSpace2XL,
+          bottom: MediaQuery.of(context).viewInsets.bottom + kSpace2XL,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Edit Profile',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: kScaffoldBgColor,
+                        padding: const EdgeInsets.all(kSpaceSM),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: kSpace2XL),
+
+                // Error
+                if (_error != null) ...[
+                  _ErrorBanner(
+                    message: _error!,
+                    onDismiss: () => setState(() => _error = null),
+                  ),
+                  const SizedBox(height: kSpaceLG),
+                ],
+
+                _SheetField(
+                  label: 'Full Name',
+                  controller: _nameController,
+                  icon: Icons.person_outline,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Name is required' : null,
+                ),
+                // _SheetField(
+                //   label: 'Username',
+                //   controller: _usernameController,
+                //   icon: Icons.alternate_email,
+                //   validator: (v) {
+                //     if (v == null || v.isEmpty) {
+                //       return 'Username is required';
+                //     }
+                //     if (v.length < 3) {
+                //       return 'Username min 3 characters';
+                //     }
+                //     return null;
+                //   },
+                // ),
+                _SheetField(
+                  label: 'Phone Number',
+                  controller: _phoneController,
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Phone is required' : null,
+                ),
+                _SheetField(
+                  label: 'Avatar URL (optional)',
+                  controller: _avatarController,
+                  icon: Icons.image_outlined,
+                  required: false,
+                ),
+                const SizedBox(height: kSpaceSM),
+
+                // Submit
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Save Changes',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _ChangePasswordSheet — PUT /api/profile/password  (password_hash)
+// ---------------------------------------------------------------------------
+
+class _ChangePasswordSheet extends StatefulWidget {
+  const _ChangePasswordSheet();
+
+  @override
+  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_newController.text != _confirmController.text) {
+      setState(() => _error = 'New passwords do not match');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final token = context.read<AuthProvider>().token!;
+      final response = await http.put(
+        Uri.parse('$kBaseUrl/api/profile/password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'current_password': _currentController.text,
+          'password': _newController.text,
+          'password_confirmation': _confirmController.text,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password changed successfully'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        setState(() => _error = data['message'] ?? 'Password update failed');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: kScaffoldBgColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
+        ),
+        padding: EdgeInsets.only(
+          left: kSpaceXL,
+          right: kSpaceXL,
+          top: kSpace2XL,
+          bottom: MediaQuery.of(context).viewInsets.bottom + kSpace2XL,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Change Password',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: kScaffoldBgColor,
+                        padding: const EdgeInsets.all(kSpaceSM),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: kSpace2XL),
+
+                // Error
+                if (_error != null) ...[
+                  _ErrorBanner(
+                    message: _error!,
+                    onDismiss: () => setState(() => _error = null),
+                  ),
+                  const SizedBox(height: kSpaceLG),
+                ],
+
+                _PasswordField(
+                  label: 'Current Password',
+                  controller: _currentController,
+                  obscure: _obscureCurrent,
+                  onToggle: () =>
+                      setState(() => _obscureCurrent = !_obscureCurrent),
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'Current password is required'
+                      : null,
+                ),
+                _PasswordField(
+                  label: 'New Password',
+                  controller: _newController,
+                  obscure: _obscureNew,
+                  onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'New password is required';
+                    }
+                    if (v.length < 8) return 'Must be at least 8 characters';
+                    return null;
+                  },
+                ),
+                _PasswordField(
+                  label: 'Confirm New Password',
+                  controller: _confirmController,
+                  obscure: _obscureConfirm,
+                  onToggle: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'Please confirm your new password'
+                      : null,
+                ),
+                const SizedBox(height: kSpaceSM),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Update Password',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AddressFormSheet — public, also used from menu
 // ---------------------------------------------------------------------------
 
 class AddressFormSheet extends StatefulWidget {
@@ -845,101 +1326,106 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: kScaffoldBgColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
-      ),
-      padding: EdgeInsets.only(
-        left: kSpaceXL,
-        right: kSpaceXL,
-        top: kSpace2XL,
-        bottom: MediaQuery.of(context).viewInsets.bottom + kSpace2XL,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _isEdit ? 'Edit Address' : 'Add New Address',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: kScaffoldBgColor,
-                      padding: const EdgeInsets.all(kSpaceSM),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: kScaffoldBgColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
+        ),
+        padding: EdgeInsets.only(
+          left: kSpaceXL,
+          right: kSpaceXL,
+          top: kSpace2XL,
+          bottom: MediaQuery.of(context).viewInsets.bottom + kSpace2XL,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _isEdit ? 'Edit Address' : 'Add New Address',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: kSpace2XL),
-
-              _FormField(
-                label: 'Recipient Name',
-                controller: _nameController,
-                icon: Icons.person_outline,
-              ),
-              _FormField(
-                label: 'Phone',
-                controller: _phoneController,
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              _FormField(
-                label: 'Address Line',
-                controller: _addressController,
-                icon: Icons.home_outlined,
-                maxLines: 2,
-              ),
-              _FormField(
-                label: 'City',
-                controller: _cityController,
-                icon: Icons.location_city_outlined,
-              ),
-              _FormField(
-                label: 'Province',
-                controller: _provinceController,
-                icon: Icons.map_outlined,
-              ),
-              _FormField(
-                label: 'Postal Code',
-                controller: _postalController,
-                icon: Icons.markunread_mailbox_outlined,
-                keyboardType: TextInputType.number,
-              ),
-
-              _DefaultToggle(
-                isDefault: _isDefault,
-                onChanged: (val) => setState(() => _isDefault = val),
-              ),
-              const SizedBox(height: kSpace2XL),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _clearForm,
-                      child: const Text('Clear'),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: kScaffoldBgColor,
+                        padding: const EdgeInsets.all(kSpaceSM),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: kSpaceLG),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _save,
-                      child: Text(_isEdit ? 'Update Address' : 'Save Address'),
+                  ],
+                ),
+                const SizedBox(height: kSpace2XL),
+
+                _FormField(
+                  label: 'Recipient Name',
+                  controller: _nameController,
+                  icon: Icons.person_outline,
+                ),
+                _FormField(
+                  label: 'Phone',
+                  controller: _phoneController,
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                _FormField(
+                  label: 'Address Line',
+                  controller: _addressController,
+                  icon: Icons.home_outlined,
+                  maxLines: 2,
+                ),
+                _FormField(
+                  label: 'City',
+                  controller: _cityController,
+                  icon: Icons.location_city_outlined,
+                ),
+                _FormField(
+                  label: 'Province',
+                  controller: _provinceController,
+                  icon: Icons.map_outlined,
+                ),
+                _FormField(
+                  label: 'Postal Code',
+                  controller: _postalController,
+                  icon: Icons.markunread_mailbox_outlined,
+                  keyboardType: TextInputType.number,
+                ),
+
+                _DefaultToggle(
+                  isDefault: _isDefault,
+                  onChanged: (val) => setState(() => _isDefault = val),
+                ),
+                const SizedBox(height: kSpace2XL),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _clearForm,
+                        child: const Text('Clear'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: kSpaceLG),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _save,
+                        child: Text(
+                          _isEdit ? 'Update Address' : 'Save Address',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -947,7 +1433,105 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
   }
 }
 
-// ─── Form field ──────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Shared form field widgets
+// ---------------------------------------------------------------------------
+
+class _SheetField extends StatelessWidget {
+  const _SheetField({
+    required this.label,
+    required this.controller,
+    required this.icon,
+    this.keyboardType,
+    this.validator,
+    this.required = true,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: kSpaceLG),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: kSpaceSM),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: 'Enter $label',
+            prefixIcon: Icon(icon, size: 22),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _PasswordField extends StatelessWidget {
+  const _PasswordField({
+    required this.label,
+    required this.controller,
+    required this.obscure,
+    required this.onToggle,
+    this.validator,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final bool obscure;
+  final VoidCallback onToggle;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: kSpaceLG),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: kSpaceSM),
+        TextFormField(
+          controller: controller,
+          obscureText: obscure,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: label,
+            prefixIcon: const Icon(Icons.lock_outline, size: 22),
+            suffixIcon: IconButton(
+              onPressed: onToggle,
+              icon: Icon(
+                obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 22,
+                color: kTextSecondaryColor,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 class _FormField extends StatelessWidget {
   const _FormField({
@@ -992,8 +1576,6 @@ class _FormField extends StatelessWidget {
     ),
   );
 }
-
-// ─── Default toggle ──────────────────────────────────────────────────────────
 
 class _DefaultToggle extends StatelessWidget {
   const _DefaultToggle({required this.isDefault, required this.onChanged});
@@ -1047,6 +1629,48 @@ class _DefaultToggle extends StatelessWidget {
           value: isDefault,
           onChanged: onChanged,
           activeThumbColor: kPrimaryColor,
+        ),
+      ],
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Error banner (shared)
+// ---------------------------------------------------------------------------
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(kSpaceLG),
+    decoration: BoxDecoration(
+      color: Colors.red.shade50,
+      borderRadius: BorderRadius.circular(kRadiusMD - 2),
+      border: Border.all(color: Colors.red.shade200),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.error_outline, color: kErrorColor, size: 22),
+        const SizedBox(width: kSpaceMD),
+        Expanded(
+          child: Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: kErrorColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.close, color: kErrorColor, size: 20),
+          onPressed: onDismiss,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
         ),
       ],
     ),

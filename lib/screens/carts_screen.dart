@@ -11,8 +11,7 @@ import '../utilities/constants.dart';
 import '../widgets/header_widget.dart';
 
 // ---------------------------------------------------------------------------
-// CartsScreen — shopping cart with voucher support and order summary.
-// Replaces: cart_page.dart  →  screens/carts_screen.dart
+// CartsScreen
 // ---------------------------------------------------------------------------
 
 class CartsScreen extends StatefulWidget {
@@ -23,32 +22,27 @@ class CartsScreen extends StatefulWidget {
 }
 
 class _CartsScreenState extends State<CartsScreen> {
-  // ─── STATE ─────────────────────────────────────────────────────────────────
-
   static const int _shipping = 15000;
   static const int _insurance = 5000;
   int _discount = 0;
   String? _appliedVoucher;
 
-  // ─── LIFECYCLE ─────────────────────────────────────────────────────────────
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CartsProvider>().loadCart();
+      final token = context.read<AuthProvider>().token;
+      if (token != null) {
+        context.read<CartsProvider>().loadCart(token);
+      }
     });
   }
-
-  // ─── HELPERS ───────────────────────────────────────────────────────────────
 
   String _formatPrice(int price) =>
       'Rp ${price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
 
   int _grandTotal(int subtotal) =>
       subtotal - _discount + _shipping + _insurance;
-
-  // ─── VOUCHER SHEET ─────────────────────────────────────────────────────────
 
   void _showVoucherSheet(int subtotal) {
     showModalBottomSheet(
@@ -66,8 +60,6 @@ class _CartsScreenState extends State<CartsScreen> {
     );
   }
 
-  // ─── BUILD ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,7 +70,6 @@ class _CartsScreenState extends State<CartsScreen> {
           if (cart.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
-
           return SingleChildScrollView(
             padding: const EdgeInsets.all(kSpaceLG),
             child: Column(
@@ -86,7 +77,6 @@ class _CartsScreenState extends State<CartsScreen> {
               children: [
                 _PageHeader(cart: cart),
                 const SizedBox(height: kSpaceXL),
-
                 if (!cart.hasItems)
                   _EmptyCart()
                 else ...[
@@ -122,8 +112,6 @@ class _CartsScreenState extends State<CartsScreen> {
     );
   }
 
-  // ─── DELETE DIALOG ─────────────────────────────────────────────────────────
-
   void _showDeleteDialog(CartsProvider cart, CartItem item) {
     showDialog(
       context: context,
@@ -137,7 +125,10 @@ class _CartsScreenState extends State<CartsScreen> {
           ),
           TextButton(
             onPressed: () {
-              cart.removeFromCart(item.id);
+              final token = context.read<AuthProvider>().token;
+              if (token != null && item.cartItemId != null) {
+                cart.removeFromCart(cartItemId: item.cartItemId!, token: token);
+              }
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -158,99 +149,88 @@ class _CartsScreenState extends State<CartsScreen> {
 // Private sub-widgets
 // ---------------------------------------------------------------------------
 
-// ─── Page header ────────────────────────────────────────────────────────────
-
 class _PageHeader extends StatelessWidget {
   const _PageHeader({required this.cart});
-
   final CartsProvider cart;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text('Shopping Cart', style: Theme.of(context).textTheme.headlineSmall),
-        if (cart.hasItems)
-          Text(
-            '${cart.itemCount} item${cart.itemCount > 1 ? 's' : ''}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: kTextSecondaryColor,
-              fontWeight: FontWeight.w500,
-            ),
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text('Shopping Cart', style: Theme.of(context).textTheme.headlineSmall),
+      if (cart.hasItems)
+        Text(
+          '${cart.itemCount} item${cart.itemCount > 1 ? 's' : ''}',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: kTextSecondaryColor,
+            fontWeight: FontWeight.w500,
           ),
-      ],
-    );
-  }
+        ),
+    ],
+  );
 }
-
-// ─── Empty cart ──────────────────────────────────────────────────────────────
 
 class _EmptyCart extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(kSpace3XL),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(kRadiusLG),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(kSpace3XL),
+    decoration: BoxDecoration(
+      color: kSurfaceColor,
+      borderRadius: BorderRadius.circular(kRadiusLG),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: const BoxDecoration(
+            color: kScaffoldBgColor,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: const BoxDecoration(
-              color: kScaffoldBgColor,
-              shape: BoxShape.circle,
+          child: const Icon(
+            Icons.shopping_cart_outlined,
+            size: 60,
+            color: kBorderColor,
+          ),
+        ),
+        const SizedBox(height: kSpace2XL),
+        Text(
+          'Your cart is empty',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: kSpaceMD),
+        Text(
+          "You haven't added any products yet. Start shopping to fill it up!",
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: kTextSecondaryColor,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: kSpace2XL),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/',
+              (route) => false,
             ),
-            child: const Icon(
-              Icons.shopping_cart_outlined,
-              size: 60,
-              color: kBorderColor,
-            ),
+            icon: const Icon(Icons.shopping_bag_outlined),
+            label: const Text('Start Shopping'),
           ),
-          const SizedBox(height: kSpace2XL),
-          Text(
-            'Your cart is empty',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: kSpaceMD),
-          Text(
-            "You haven't added any products yet. Start shopping to fill it up!",
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: kTextSecondaryColor,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: kSpace2XL),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/',
-                (route) => false,
-              ),
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: const Text('Start Shopping'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
-
-// ─── Cart items list ─────────────────────────────────────────────────────────
 
 class _CartItems extends StatelessWidget {
   const _CartItems({
@@ -264,43 +244,41 @@ class _CartItems extends StatelessWidget {
   final void Function(CartItem) onDeleteTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(kSpaceLG),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(kRadiusLG),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: cart.items.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          return Column(
-            children: [
-              _CartItemRow(
-                cart: cart,
-                item: item,
-                formatPrice: formatPrice,
-                onDelete: () => onDeleteTap(item),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(kSpaceLG),
+    decoration: BoxDecoration(
+      color: kSurfaceColor,
+      borderRadius: BorderRadius.circular(kRadiusLG),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      children: cart.items.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        return Column(
+          children: [
+            _CartItemRow(
+              cart: cart,
+              item: item,
+              formatPrice: formatPrice,
+              onDelete: () => onDeleteTap(item),
+            ),
+            if (index < cart.items.length - 1)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: kSpaceLG),
+                child: Divider(color: kBorderColor, height: 1),
               ),
-              if (index < cart.items.length - 1)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: kSpaceLG),
-                  child: Divider(color: kBorderColor, height: 1),
-                ),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
+          ],
+        );
+      }).toList(),
+    ),
+  );
 }
 
 class _CartItemRow extends StatelessWidget {
@@ -317,82 +295,76 @@ class _CartItemRow extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Thumbnail
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: kScaffoldBgColor,
-            borderRadius: BorderRadius.circular(kRadiusMD - 2),
-            border: Border.all(color: kBorderColor),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(kRadiusMD - 3),
-            child: Image.network(
-              item.image,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Icon(
-                Icons.image_not_supported_outlined,
-                color: kBorderColor,
-              ),
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // thumbnail
+      Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          color: kScaffoldBgColor,
+          borderRadius: BorderRadius.circular(kRadiusMD - 2),
+          border: Border.all(color: kBorderColor),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kRadiusMD - 3),
+          child: Image.network(
+            item.image,
+            fit: BoxFit.contain,
+            // FIX: replaced duplicate `_` wildcards with distinct parameter names
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.image_not_supported_outlined,
+              color: kBorderColor,
             ),
           ),
         ),
-
-        const SizedBox(width: kSpaceMD),
-
-        // Info + controls
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.productName,
-                style: Theme.of(context).textTheme.titleSmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: kSpaceXS),
-              Text(
-                item.variantText,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: kTextSecondaryColor),
-              ),
-              const SizedBox(height: kSpaceSM),
-              Row(
-                children: [
-                  Text(
-                    formatPrice(item.variantPrice),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleSmall?.copyWith(color: kPrimaryColor),
-                  ),
-                  const Spacer(),
-                  _QuantityControls(cart: cart, item: item),
-                ],
-              ),
-            ],
-          ),
+      ),
+      const SizedBox(width: kSpaceMD),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.productName,
+              style: Theme.of(context).textTheme.titleSmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: kSpaceXS),
+            Text(
+              item.variantText,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: kTextSecondaryColor),
+            ),
+            const SizedBox(height: kSpaceSM),
+            Row(
+              children: [
+                Text(
+                  formatPrice(item.variantPrice),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: kPrimaryColor),
+                ),
+                const Spacer(),
+                _QuantityControls(cart: cart, item: item),
+              ],
+            ),
+          ],
         ),
-
-        // Delete
-        IconButton(
-          icon: const Icon(Icons.delete_outline),
-          iconSize: 22,
-          color: kTextSecondaryColor,
-          onPressed: onDelete,
-        ),
-      ],
-    );
-  }
+      ),
+      IconButton(
+        icon: const Icon(Icons.delete_outline),
+        iconSize: 22,
+        color: kTextSecondaryColor,
+        onPressed: onDelete,
+      ),
+    ],
+  );
 }
 
-// ─── Quantity controls ───────────────────────────────────────────────────────
+// ─── Quantity controls ────────────────────────────────────────────────────────
 
 class _QuantityControls extends StatelessWidget {
   const _QuantityControls({required this.cart, required this.item});
@@ -413,7 +385,12 @@ class _QuantityControls extends StatelessWidget {
         children: [
           _QtyButton(
             icon: Icons.remove,
-            onTap: () => cart.decreaseQuantity(item.id),
+            onTap: item.cartItemId == null
+                ? null
+                : () {
+                    final token = context.read<AuthProvider>().token ?? '';
+                    cart.decreaseQuantity(item.cartItemId!, token);
+                  },
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: kSpaceMD),
@@ -424,7 +401,12 @@ class _QuantityControls extends StatelessWidget {
           ),
           _QtyButton(
             icon: Icons.add,
-            onTap: () => cart.increaseQuantity(item.id),
+            onTap: item.cartItemId == null
+                ? null
+                : () {
+                    final token = context.read<AuthProvider>().token ?? '';
+                    cart.increaseQuantity(item.cartItemId!, token);
+                  },
           ),
         ],
       ),
@@ -436,21 +418,21 @@ class _QtyButton extends StatelessWidget {
   const _QtyButton({required this.icon, required this.onTap});
 
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(kSpaceXS + 2),
-        child: Icon(icon, size: 16, color: kTextSecondaryColor),
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.all(kSpaceXS + 2),
+      child: Icon(
+        icon,
+        size: 16,
+        color: onTap != null ? kTextSecondaryColor : kBorderColor,
       ),
-    );
-  }
+    ),
+  );
 }
-
-// ─── Voucher row ─────────────────────────────────────────────────────────────
 
 class _VoucherRow extends StatelessWidget {
   const _VoucherRow({required this.appliedVoucher, required this.onTap});
@@ -459,67 +441,61 @@ class _VoucherRow extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(kRadiusLG),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(kSpaceLG),
-        decoration: BoxDecoration(
-          color: kSurfaceColor,
-          borderRadius: BorderRadius.circular(kRadiusLG),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.local_offer_outlined,
-              color: kPrimaryColor,
-              size: 22,
-            ),
-            const SizedBox(width: kSpaceMD),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(kRadiusLG),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(kSpaceLG),
+      decoration: BoxDecoration(
+        color: kSurfaceColor,
+        borderRadius: BorderRadius.circular(kRadiusLG),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.local_offer_outlined,
+            color: kPrimaryColor,
+            size: 22,
+          ),
+          const SizedBox(width: kSpaceMD),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appliedVoucher != null ? 'Voucher Applied' : 'Apply Voucher',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: appliedVoucher != null
+                        ? kPrimaryColor
+                        : kTextPrimaryColor,
+                  ),
+                ),
+                if (appliedVoucher != null) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    appliedVoucher != null
-                        ? 'Voucher Applied'
-                        : 'Apply Voucher',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: appliedVoucher != null
-                          ? kPrimaryColor
-                          : kTextPrimaryColor,
+                    appliedVoucher!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.green.shade600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (appliedVoucher != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      appliedVoucher!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.green.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
-            Icon(Icons.chevron_right, color: kBorderColor, size: 22),
-          ],
-        ),
+          ),
+          Icon(Icons.chevron_right, color: kBorderColor, size: 22),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
-
-// ─── Order summary ───────────────────────────────────────────────────────────
 
 class _Summary extends StatelessWidget {
   const _Summary({
@@ -539,64 +515,62 @@ class _Summary extends StatelessWidget {
   final String Function(int) formatPrice;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(kSpaceXL),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        borderRadius: BorderRadius.circular(kRadiusLG),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.receipt_long_outlined,
-                size: 22,
-                color: kTextSecondaryColor,
-              ),
-              const SizedBox(width: kSpaceSM),
-              Text(
-                'Order Summary',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: kSpaceXL),
-          _Row(label: 'Subtotal', value: formatPrice(subtotal)),
-          const SizedBox(height: kSpaceMD),
-          _Row(label: 'Shipping', value: formatPrice(shipping)),
-          const SizedBox(height: kSpaceMD),
-          _Row(label: 'Shipping Insurance', value: formatPrice(insurance)),
-          const SizedBox(height: kSpaceMD),
-          _Row(
-            label: 'Voucher Discount',
-            value: discount > 0 ? '-${formatPrice(discount)}' : formatPrice(0),
-            valueColor: discount > 0 ? Colors.green.shade700 : null,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: kSpaceLG),
-            child: Divider(color: kBorderColor, thickness: 1),
-          ),
-          _Row(
-            label: 'Grand Total',
-            value: formatPrice(grandTotal),
-            bold: true,
-            valueColor: kPrimaryColor,
-            fontSize: 20,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(kSpaceXL),
+    decoration: BoxDecoration(
+      color: kSurfaceColor,
+      borderRadius: BorderRadius.circular(kRadiusLG),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 22,
+              color: kTextSecondaryColor,
+            ),
+            const SizedBox(width: kSpaceSM),
+            Text(
+              'Order Summary',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ],
+        ),
+        const SizedBox(height: kSpaceXL),
+        _Row(label: 'Subtotal', value: formatPrice(subtotal)),
+        const SizedBox(height: kSpaceMD),
+        _Row(label: 'Shipping', value: formatPrice(shipping)),
+        const SizedBox(height: kSpaceMD),
+        _Row(label: 'Shipping Insurance', value: formatPrice(insurance)),
+        const SizedBox(height: kSpaceMD),
+        _Row(
+          label: 'Voucher Discount',
+          value: discount > 0 ? '-${formatPrice(discount)}' : formatPrice(0),
+          valueColor: discount > 0 ? Colors.green.shade700 : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: kSpaceLG),
+          child: Divider(color: kBorderColor, thickness: 1),
+        ),
+        _Row(
+          label: 'Grand Total',
+          value: formatPrice(grandTotal),
+          bold: true,
+          valueColor: kPrimaryColor,
+          fontSize: 20,
+        ),
+      ],
+    ),
+  );
 }
 
 class _Row extends StatelessWidget {
@@ -641,62 +615,52 @@ class _Row extends StatelessWidget {
   }
 }
 
-// ─── Bottom action bar ───────────────────────────────────────────────────────
-
 class _BottomBar extends StatelessWidget {
   const _BottomBar({required this.cart});
-
   final CartsProvider cart;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        kSpaceLG,
-        kSpaceMD,
-        kSpaceLG,
-        kSpace2XL,
-      ),
-      decoration: BoxDecoration(
-        color: kSurfaceColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              final auth = context.read<AuthProvider>();
-              if (!auth.isLoggedIn) {
-                Navigator.pushNamed(context, '/login');
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-              );
-            },
-            child: Text(
-              cart.hasItems
-                  ? 'Checkout (${cart.itemCount} ${cart.itemCount > 1 ? 'items' : 'item'})'
-                  : 'Checkout (0 items)',
-            ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(kSpaceLG, kSpaceMD, kSpaceLG, kSpace2XL),
+    decoration: BoxDecoration(
+      color: kSurfaceColor,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 12,
+          offset: const Offset(0, -4),
+        ),
+      ],
+    ),
+    child: SafeArea(
+      top: false,
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () {
+            final auth = context.read<AuthProvider>();
+            if (!auth.isLoggedIn) {
+              Navigator.pushNamed(context, '/login');
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+            );
+          },
+          child: Text(
+            cart.hasItems
+                ? 'Checkout (${cart.itemCount} ${cart.itemCount > 1 ? 'items' : 'item'})'
+                : 'Checkout (0 items)',
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
-// _VoucherSheet — bottom sheet for selecting / entering a voucher code.
+// _VoucherSheet
 // ---------------------------------------------------------------------------
 
 class _VoucherSheet extends StatefulWidget {
@@ -722,13 +686,10 @@ class _VoucherSheetState extends State<_VoucherSheet> {
   void initState() {
     super.initState();
     _selectedCode = widget.currentApplied;
-
     Future.microtask(() {
       if (!mounted) return;
       final token = context.read<AuthProvider>().token;
-      if (token != null && token.isNotEmpty) {
-        context.read<VouchersProvider>().loadVouchers(token);
-      }
+      if (token != null) context.read<VouchersProvider>().loadVouchers(token);
     });
   }
 
@@ -738,18 +699,14 @@ class _VoucherSheetState extends State<_VoucherSheet> {
     super.dispose();
   }
 
-  // ─── HELPERS ───────────────────────────────────────────────────────────────
-
   String _formatPrice(int price) =>
       'Rp ${price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
 
   void _applyCode() {
     final code = _codeController.text.trim().toUpperCase();
     if (code.isEmpty) return;
-
     final vouchers = context.read<VouchersProvider>().vouchers;
     final match = vouchers.where((v) => v.code == code).firstOrNull;
-
     if (match == null) {
       _showSnack('Voucher code not found', isError: true);
       return;
@@ -758,7 +715,6 @@ class _VoucherSheetState extends State<_VoucherSheet> {
       _showSnack('This voucher has expired', isError: true);
       return;
     }
-
     setState(() => _selectedCode = code);
     _codeController.clear();
     FocusScope.of(context).unfocus();
@@ -766,11 +722,9 @@ class _VoucherSheetState extends State<_VoucherSheet> {
 
   void _applySelected() {
     if (_selectedCode == null) return;
-
     final voucher = context.read<VouchersProvider>().vouchers.firstWhere(
       (v) => v.code == _selectedCode,
     );
-
     if (widget.subtotal < voucher.minOrder) {
       _showSnack(
         'Minimum purchase ${_formatPrice(voucher.minOrder.toInt())} required',
@@ -778,7 +732,6 @@ class _VoucherSheetState extends State<_VoucherSheet> {
       );
       return;
     }
-
     int discount = 0;
     if (voucher.type == DiscountType.percentage) {
       discount = (widget.subtotal * voucher.value / 100).round();
@@ -788,12 +741,10 @@ class _VoucherSheetState extends State<_VoucherSheet> {
     } else {
       discount = voucher.value.toInt();
     }
-
     context.read<CartsProvider>().applyVoucher(
       code: _selectedCode!,
       discount: discount,
     );
-
     widget.onVoucherApplied(_selectedCode!, discount);
     Navigator.pop(context);
     _showSnack('Voucher "$_selectedCode" applied!', isSuccess: true);
@@ -826,180 +777,170 @@ class _VoucherSheetState extends State<_VoucherSheet> {
     );
   }
 
-  // ─── BUILD ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: kScaffoldBgColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
-      ),
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (_, scrollController) => Padding(
-          padding: EdgeInsets.only(
-            left: kSpaceXL,
-            right: kSpaceXL,
-            top: kSpaceXL,
-            bottom: MediaQuery.of(context).viewInsets.bottom + kSpaceXL,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kBorderColor,
-                    borderRadius: BorderRadius.circular(2),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: kScaffoldBgColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(kSpace2XL)),
+        ),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) => Padding(
+            padding: EdgeInsets.only(
+              left: kSpaceXL,
+              right: kSpaceXL,
+              top: kSpaceXL,
+              bottom: MediaQuery.of(context).viewInsets.bottom + kSpaceXL,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: kBorderColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: kSpaceLG),
-
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Use Voucher',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: kScaffoldBgColor,
-                      padding: const EdgeInsets.all(kSpaceSM),
+                const SizedBox(height: kSpaceLG),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Use Voucher',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: kSpaceXL),
-
-              // Code input + apply
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _codeController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter voucher code',
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: kScaffoldBgColor,
+                        padding: const EdgeInsets.all(kSpaceSM),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: kSpaceMD),
-                  ElevatedButton(
-                    onPressed: _applyCode,
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: kSpace2XL),
-
-              // OR divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: kBorderColor)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: kSpaceMD),
-                    child: Text(
-                      'OR',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: kTextSecondaryColor,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: kBorderColor)),
-                ],
-              ),
-              const SizedBox(height: kSpaceXL),
-
-              Text(
-                'Available Vouchers',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: kSpaceMD),
-
-              // Voucher list
-              Expanded(
-                child: Consumer<VouchersProvider>(
-                  builder: (_, vp, _) {
-                    if (vp.loading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (vp.vouchers.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No vouchers available',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: kTextSecondaryColor),
+                  ],
+                ),
+                const SizedBox(height: kSpaceXL),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _codeController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter voucher code',
                         ),
-                      );
-                    }
-                    return ListView.separated(
-                      controller: scrollController,
-                      itemCount: vp.vouchers.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: kSpaceMD),
-                      itemBuilder: (_, i) {
-                        final v = vp.vouchers[i];
-                        return _VoucherCard(
-                          voucher: v,
-                          isSelected: _selectedCode == v.code,
-                          onTap: () => setState(
-                            () => _selectedCode = _selectedCode == v.code
-                                ? null
-                                : v.code,
+                      ),
+                    ),
+                    const SizedBox(width: kSpaceMD),
+                    ElevatedButton(
+                      onPressed: _applyCode,
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: kSpace2XL),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: kBorderColor)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: kSpaceMD),
+                      child: Text(
+                        'OR',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: kTextSecondaryColor,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: kBorderColor)),
+                  ],
+                ),
+                const SizedBox(height: kSpaceXL),
+                Text(
+                  'Available Vouchers',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: kSpaceMD),
+                Expanded(
+                  child: Consumer<VouchersProvider>(
+                    // FIX: replaced duplicate `_` wildcard with distinct parameter names
+                    builder: (context, vp, child) {
+                      if (vp.loading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (vp.vouchers.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No vouchers available',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: kTextSecondaryColor),
                           ),
                         );
-                      },
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: kSpaceLG),
-
-              // Bottom buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _reset,
-                      child: const Text('Reset'),
-                    ),
+                      }
+                      return ListView.separated(
+                        controller: scrollController,
+                        itemCount: vp.vouchers.length,
+                        // FIX: replaced duplicate `_` wildcard with distinct parameter names
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: kSpaceMD),
+                        itemBuilder: (context, i) {
+                          final v = vp.vouchers[i];
+                          return _VoucherCard(
+                            voucher: v,
+                            isSelected: _selectedCode == v.code,
+                            onTap: () => setState(() {
+                              _selectedCode = _selectedCode == v.code
+                                  ? null
+                                  : v.code;
+                            }),
+                          );
+                        },
+                      );
+                    },
                   ),
-                  const SizedBox(width: kSpaceMD),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _selectedCode != null ? _applySelected : null,
-                      child: Text(
-                        _selectedCode != null
-                            ? 'Apply Voucher'
-                            : 'Select a Voucher',
+                ),
+                const SizedBox(height: kSpaceLG),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _reset,
+                        child: const Text('Reset'),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: kSpaceMD),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _selectedCode != null
+                            ? _applySelected
+                            : null,
+                        child: Text(
+                          _selectedCode != null
+                              ? 'Apply Voucher'
+                              : 'Select a Voucher',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
-// ─── Voucher card ────────────────────────────────────────────────────────────
 
 class _VoucherCard extends StatelessWidget {
   const _VoucherCard({
@@ -1015,17 +956,14 @@ class _VoucherCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isExpired = voucher.isExpired;
-
-    final List<Color> badgeColors = voucher.type == DiscountType.percentage
+    final badgeColors = voucher.type == DiscountType.percentage
         ? [Colors.orange.shade400, Colors.deepOrange.shade600]
         : [Colors.blue.shade400, Colors.indigo.shade600];
-
-    final String valueLabel = voucher.type == DiscountType.percentage
+    final valueLabel = voucher.type == DiscountType.percentage
         ? '${voucher.value.toInt()}%'
         : 'Rp ${voucher.value.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-
     final diff = voucher.endAt.difference(DateTime.now());
-    final String expiry = isExpired
+    final expiry = isExpired
         ? 'Expired'
         : diff.inDays > 0
         ? 'Expires in ${diff.inDays}d'
@@ -1055,7 +993,6 @@ class _VoucherCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Left badge
               Container(
                 width: 72,
                 padding: const EdgeInsets.symmetric(vertical: kSpaceXL),
@@ -1095,8 +1032,6 @@ class _VoucherCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Dashed separator
               Column(
                 children: List.generate(
                   6,
@@ -1108,8 +1043,6 @@ class _VoucherCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Right content
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(

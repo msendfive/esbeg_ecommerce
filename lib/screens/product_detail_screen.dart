@@ -11,12 +11,8 @@ import '../widgets/header_widget.dart';
 import '../widgets/footer_widget.dart';
 
 // ---------------------------------------------------------------------------
-// ProductDetailScreen — full product detail with variant selection and cart.
-// Replaces: product_detail_page.dart  →  screens/product_detail_screen.dart
+// ProductDetailScreen
 // ---------------------------------------------------------------------------
-
-// ─── ProductVariant model ────────────────────────────────────────────────────
-// Kept in this file; move to models/ when the API model layer is extended.
 
 class ProductVariant {
   final int variantId;
@@ -34,7 +30,8 @@ class ProductVariant {
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) => ProductVariant(
-    variantId: json['variant_id'] as int,
+    // API may return 'variant_id' (cart/detail) or 'id' (product listing)
+    variantId: (json['variant_id'] ?? json['id']) as int,
     color: json['color'] as String? ?? '',
     size: json['size'] as String? ?? '',
     price: double.tryParse(json['price'].toString()) ?? 0,
@@ -42,12 +39,10 @@ class ProductVariant {
   );
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
 class ProductDetailScreen extends StatefulWidget {
   final String productName;
-  final String image; // full URL
-  final int price; // base price
+  final String image;
+  final int price;
   final String brand;
   final int categoryId;
   final String categoryName;
@@ -71,8 +66,6 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  // ─── STATE ─────────────────────────────────────────────────────────────────
-
   late final List<ProductVariant> _variants;
   final PageController _pageController = PageController();
   late final TextEditingController _quantityController;
@@ -81,8 +74,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? _selectedSize;
   String? _selectedColor;
   int _quantity = 1;
-
-  // ─── LIFECYCLE ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -100,7 +91,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.dispose();
   }
 
-  // ─── VARIANT HELPERS ───────────────────────────────────────────────────────
+  // ── variant helpers ───────────────────────────────────────────────────────
 
   bool get _hasVariants => _variants.isNotEmpty;
 
@@ -158,7 +149,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return _variants.any((v) => v.color == color && v.stock > 0) ? 1 : 0;
   }
 
-  // ─── HELPERS ───────────────────────────────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────────────────────
 
   String _formatPrice(int price) =>
       'Rp ${price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
@@ -259,63 +250,150 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  void _addToCart() {
+  // ── ADD TO CART — calls API via CartsProvider ─────────────────────────────
+
+  Future<void> _addToCart() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn || auth.token == null) {
+      Navigator.pushNamed(context, '/login');
+      return;
+    }
+
+    // Must have a variant selected when variants exist
+    if (_hasVariants && _selectedVariant == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select size and color first'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.orange.shade700,
+        ),
+      );
+      return;
+    }
+
+    final variantId = _selectedVariant?.variantId;
+    if (variantId == null) {
+      // Product has no variants — cannot be added via this API
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('This product has no available variants'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.orange.shade700,
+        ),
+      );
+      return;
+    }
+
+    final success = await context.read<CartsProvider>().addToCart(
+      variantId: variantId,
+      qty: _quantity, // ✅ matches renamed param in CartsProvider
+      token: auth.token!,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            duration: const Duration(milliseconds: 700),
+            margin: const EdgeInsets.all(kSpaceLG),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(kRadiusMD),
+            ),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: kSpaceMD),
+                Expanded(
+                  child: Text(
+                    'Added $_quantity ${_quantity > 1 ? 'items' : 'item'} to cart',
+                  ),
+                ),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade600,
+          ),
+        );
+
+      setState(() {
+        _selectedSize = null;
+        _selectedColor = null;
+        _quantity = 1;
+        _quantityController.text = '1';
+      });
+    } else {
+      final cart = context.read<CartsProvider>();
+      // 401 expired token → force re-login
+      if (cart.sessionExpired) {
+        cart.clearSessionExpired();
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+        return;
+      }
+      // Show the actual server validation/error message
+      final msg = cart.error ?? 'Failed to add item to cart';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kErrorColor,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  // ── BUY NOW ───────────────────────────────────────────────────────────────
+
+  Future<void> _buyNow() async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) {
       Navigator.pushNamed(context, '/login');
       return;
     }
 
-    context.read<CartsProvider>().addToCart(
-      CartItem(
-        productName: widget.productName,
-        image: widget.image,
-        basePrice: widget.price,
-        brand: widget.brand,
-        categoryId: widget.categoryId,
-        categoryName: widget.categoryName,
-        size: _selectedSize,
-        color: _selectedColor,
-        variantId: _selectedVariant?.variantId,
-        variantPrice: _activePrice,
-        quantity: _quantity,
-      ),
-    );
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          duration: const Duration(milliseconds: 700),
-          margin: const EdgeInsets.all(kSpaceLG),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kRadiusMD),
-          ),
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: kSpaceMD),
-              Expanded(
-                child: Text(
-                  'Added $_quantity ${_quantity > 1 ? 'items' : 'item'} to cart',
-                ),
-              ),
-            ],
-          ),
+    final variantId = _selectedVariant?.variantId;
+    if (variantId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select size and color first'),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green.shade600,
+          backgroundColor: Colors.orange,
         ),
       );
+      return;
+    }
 
-    setState(() {
-      _selectedSize = null;
-      _selectedColor = null;
-      _quantity = 1;
-      _quantityController.text = '1';
-    });
+    final success = await context.read<CartsProvider>().addToCart(
+      variantId: variantId,
+      qty: _quantity,
+      token: auth.token!,
+    );
+
+    if (!mounted) return;
+    final cart = context.read<CartsProvider>();
+    if (cart.sessionExpired) {
+      cart.clearSessionExpired();
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+      return;
+    }
+    if (success) {
+      Navigator.pushNamed(context, '/checkout');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(cart.error ?? 'Failed to add item to cart'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kErrorColor,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
-  // ─── BUILD ─────────────────────────────────────────────────────────────────
+  // ── BUILD ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -403,10 +481,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         selectedSize: _selectedSize,
         selectedColor: _selectedColor,
         currentStock: _currentStock,
-        addToCart: _addToCart,
-        onBuyNow: () {
+        addToCart: () {
           _addToCart();
-          Navigator.pushNamed(context, '/cart');
+        }, // wrap async in void
+        onBuyNow: () {
+          _buyNow();
         },
       ),
     );
@@ -414,10 +493,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Private sub-widgets
+// Private sub-widgets (unchanged from original)
 // ---------------------------------------------------------------------------
-
-// ─── Breadcrumb ─────────────────────────────────────────────────────────────
 
 class _Breadcrumb extends StatelessWidget {
   const _Breadcrumb({
@@ -433,88 +510,76 @@ class _Breadcrumb extends StatelessWidget {
   final String productName;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: kSpaceLG,
-        vertical: kSpaceMD,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Icon(
-              Icons.home_outlined,
-              size: 16,
-              color: kTextSecondaryColor,
-            ),
-            const SizedBox(width: kSpaceXS),
-            _Item(
-              label: 'Home',
-              isFirst: true,
-              onTap: () =>
-                  Navigator.popUntil(context, (route) => route.isFirst),
-            ),
-            _Sep(),
-            _Item(
-              label: categoryName,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CategoriesScreen(
-                    categoryId: categoryId,
-                    categoryName: categoryName,
-                  ),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(
+      horizontal: kSpaceLG,
+      vertical: kSpaceMD,
+    ),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const Icon(Icons.home_outlined, size: 16, color: kTextSecondaryColor),
+          const SizedBox(width: kSpaceXS),
+          _Item(
+            label: 'Home',
+            isFirst: true,
+            onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
+          ),
+          _Sep(),
+          _Item(
+            label: categoryName,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CategoriesScreen(
+                  categoryId: categoryId,
+                  categoryName: categoryName,
                 ),
               ),
             ),
-            _Sep(),
-            _Item(
-              label: brand,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BrandsScreen(brandName: brand),
-                ),
-              ),
+          ),
+          _Sep(),
+          _Item(
+            label: brand,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => BrandsScreen(brandName: brand)),
             ),
-            _Sep(),
-            Text(
-              productName,
-              style: const TextStyle(
-                fontSize: 8,
-                color: kTextPrimaryColor,
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          _Sep(),
+          Text(
+            productName,
+            style: const TextStyle(
+              fontSize: 8,
+              color: kTextPrimaryColor,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _Item extends StatelessWidget {
   const _Item({required this.label, this.isFirst = false, this.onTap});
-
   final String label;
   final bool isFirst;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          color: isFirst ? kTextSecondaryColor : kPrimaryColor,
-          fontWeight: isFirst ? FontWeight.normal : FontWeight.w500,
-        ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 10,
+        color: isFirst ? kTextSecondaryColor : kPrimaryColor,
+        fontWeight: isFirst ? FontWeight.normal : FontWeight.w500,
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _Sep extends StatelessWidget {
@@ -525,11 +590,8 @@ class _Sep extends StatelessWidget {
   );
 }
 
-// ─── Product image ───────────────────────────────────────────────────────────
-
 class _ProductImage extends StatelessWidget {
   const _ProductImage({required this.image, required this.buildImage});
-
   final String image;
   final Widget Function(String, {BoxFit fit}) buildImage;
 
@@ -554,8 +616,6 @@ class _ProductImage extends StatelessWidget {
   );
 }
 
-// ─── Thumbnail row ───────────────────────────────────────────────────────────
-
 class _ThumbnailRow extends StatelessWidget {
   const _ThumbnailRow({
     required this.image,
@@ -563,7 +623,6 @@ class _ThumbnailRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-
   final String image;
   final Widget Function(String, {BoxFit fit}) buildImage;
   final int selected;
@@ -611,8 +670,6 @@ class _ThumbnailRow extends StatelessWidget {
   );
 }
 
-// ─── Product info card ───────────────────────────────────────────────────────
-
 class _ProductInfo extends StatelessWidget {
   const _ProductInfo({
     required this.productName,
@@ -640,9 +697,9 @@ class _ProductInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final variantFullySelected = selectedSize != null && selectedColor != null;
 
-    String stockLabel;
-    Color stockLabelColor;
-    Color stockBgColor;
+    late final String stockLabel;
+    late final Color stockLabelColor;
+    late final Color stockBgColor;
 
     if (!hasVariants) {
       stockLabel = 'In Stock';
@@ -679,7 +736,6 @@ class _ProductInfo extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Category · Brand
           Row(
             children: [
               Text(
@@ -703,12 +759,8 @@ class _ProductInfo extends StatelessWidget {
             ],
           ),
           const SizedBox(height: kSpaceMD),
-
-          // Product name
           Text(productName, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: kSpaceLG),
-
-          // Price + stock badge
           Row(
             children: [
               Text(
@@ -746,8 +798,6 @@ class _ProductInfo extends StatelessWidget {
   }
 }
 
-// ─── Rating section ──────────────────────────────────────────────────────────
-
 class _RatingSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
@@ -783,8 +833,6 @@ class _RatingSection extends StatelessWidget {
   );
 }
 
-// ─── Size selector ───────────────────────────────────────────────────────────
-
 class _SizeSelector extends StatelessWidget {
   const _SizeSelector({
     required this.sizes,
@@ -793,7 +841,6 @@ class _SizeSelector extends StatelessWidget {
     required this.onShowGuide,
     required this.onSelect,
   });
-
   final List<String> sizes;
   final String? selectedSize;
   final int Function(String) stockForSize;
@@ -843,7 +890,6 @@ class _SizeSelector extends StatelessWidget {
             final isSelected = selectedSize == size;
             final outOfStock = stockForSize(size) == 0;
             final isLast = i == sizes.length - 1;
-
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: isLast ? 0 : kSpaceMD),
@@ -880,8 +926,6 @@ class _SizeSelector extends StatelessWidget {
   );
 }
 
-// ─── Color selector ──────────────────────────────────────────────────────────
-
 class _ColorSelector extends StatelessWidget {
   const _ColorSelector({
     required this.colors,
@@ -889,7 +933,6 @@ class _ColorSelector extends StatelessWidget {
     required this.stockForColor,
     required this.onSelect,
   });
-
   final List<String> colors;
   final String? selectedColor;
   final int Function(String) stockForColor;
@@ -936,7 +979,6 @@ class _ColorSelector extends StatelessWidget {
           children: colors.map((color) {
             final isSelected = selectedColor == color;
             final outOfStock = stockForColor(color) == 0;
-
             return GestureDetector(
               onTap: outOfStock ? null : () => onSelect(color),
               child: Opacity(
@@ -975,8 +1017,6 @@ class _ColorSelector extends StatelessWidget {
   );
 }
 
-// ─── Quantity selector ───────────────────────────────────────────────────────
-
 class _QuantitySelector extends StatelessWidget {
   const _QuantitySelector({
     required this.hasVariants,
@@ -987,7 +1027,6 @@ class _QuantitySelector extends StatelessWidget {
     required this.controller,
     required this.onUpdate,
   });
-
   final bool hasVariants;
   final String? selectedSize;
   final String? selectedColor;
@@ -1067,9 +1106,8 @@ class _QuantitySelector extends StatelessWidget {
                   onChanged: (v) {
                     if (v.isEmpty) return;
                     final parsed = int.tryParse(v);
-                    if (parsed != null && parsed > 0) {
+                    if (parsed != null && parsed > 0)
                       onUpdate(parsed, maxStock);
-                    }
                   },
                   onSubmitted: (v) {
                     final parsed = int.tryParse(v);
@@ -1096,7 +1134,6 @@ class _QtyBtn extends StatelessWidget {
     required this.enabled,
     required this.onTap,
   });
-
   final IconData icon;
   final bool enabled;
   final VoidCallback onTap;
@@ -1108,7 +1145,7 @@ class _QtyBtn extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: enabled ? kScaffoldBgColor : kScaffoldBgColor,
+        color: kScaffoldBgColor,
         borderRadius: BorderRadius.circular(kRadiusSM),
         border: Border.all(color: enabled ? kBorderColor : kScaffoldBgColor),
       ),
@@ -1121,11 +1158,8 @@ class _QtyBtn extends StatelessWidget {
   );
 }
 
-// ─── Description card ────────────────────────────────────────────────────────
-
 class _DescriptionCard extends StatelessWidget {
   const _DescriptionCard({required this.description});
-
   final String? description;
 
   @override
@@ -1133,7 +1167,6 @@ class _DescriptionCard extends StatelessWidget {
     final text = (description != null && description!.isNotEmpty)
         ? description!
         : 'No description available for this product.';
-
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: kSpaceLG),
@@ -1167,8 +1200,6 @@ class _DescriptionCard extends StatelessWidget {
   }
 }
 
-// ─── Bottom action bar ───────────────────────────────────────────────────────
-
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.hasVariants,
@@ -1178,7 +1209,6 @@ class _BottomBar extends StatelessWidget {
     required this.addToCart,
     required this.onBuyNow,
   });
-
   final bool hasVariants;
   final String? selectedSize;
   final String? selectedColor;
